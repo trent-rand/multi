@@ -1,10 +1,7 @@
 package com.TrentRand_RonTieu.COE865;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.MulticastSocket;
+import java.net.*;
 import java.util.ArrayList;
 
 public class Router implements Runnable {
@@ -13,16 +10,35 @@ public class Router implements Runnable {
     private int name;
     private InetAddress hostIP;
     private ArrayList<NetworkLink> links;
+    private ArrayList<InetAddress> forwardAddress;
+    private InetAddress receivingAddress;
     private Thread routerTask;
 
     public void DumpTable() {
         System.out.println("Dumping the address table of router - "+name);
-        System.out.println(" -- ");
-        System.out.print(getLinks().toArray().toString());
-        System.out.println(" -- ");
+        System.out.println(" -- Receiving From -- ");
+        //System.out.println(getForwardAddress().toArray().toString());
+        System.out.println(receivingAddress);
+        System.out.println("");
+        System.out.println(" -- Forwarding To -- ");
+        for(InetAddress addr : forwardAddress) {
+            System.out.println(addr);
+        }
+        System.out.println("");
+
     }
 
-    public void Ping() {}
+    public void Ping(String message) {
+        if(type == 1) { //We're the source!!
+            for(InetAddress addr : forwardAddress) {
+                try {
+                    sendUDPMessage(message, addr, 4321);
+                } catch (Exception e) {
+                    System.err.println("Error attempting to ping!");
+                }
+            }
+        }
+    }
 
     public void Startup() {
         routerTask = new Thread(this::run);
@@ -34,11 +50,11 @@ public class Router implements Runnable {
 
     public void receiveUDPMessage(InetAddress ip, int port) throws IOException {
         byte[] buffer = new byte[1024];
-        MulticastSocket socket = new MulticastSocket(port);
-        socket.joinGroup(ip);
+        DatagramSocket socket = new DatagramSocket(port);
+        socket.connect(ip, port);
 
         while(true) {
-            System.out.println("Waiting for multicast message...");
+            System.out.println("Waiting for datagram message...");
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
             socket.receive(packet);
@@ -47,6 +63,18 @@ public class Router implements Runnable {
             System.out.println("[Multicast UDP message received]"+msg);
             if("OK".equals(msg)) {
                 System.out.println("End of message... "+msg);
+
+                if (type != 2) { //not type 2, therefore our boy here is a forwarding router!
+                    System.out.println("Forwarding Router "+name+" is no forwarding the packet...");
+
+                    for(InetAddress addr : forwardAddress) {
+                        try {
+                            sendUDPMessage(msg, addr, 4321);
+                        } catch (Exception e) {
+                            System.err.println("Error attempting to ping!");
+                        }
+                    }
+                }
             }
         }
 
@@ -55,12 +83,24 @@ public class Router implements Runnable {
         //socket.close();
     }
 
-    //Runnable for thread.
+    public static void sendUDPMessage(String message,
+                                      InetAddress ipAddress, int port) throws IOException {
+        DatagramSocket socket = new DatagramSocket();
 
+        byte[] msg = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(msg, msg.length,
+                ipAddress, port);
+        socket.send(packet);
+        socket.close();
+    }
+
+    //Runnable for thread.
     @Override
     public void run() {
         try {
-            receiveUDPMessage(hostIP, 4321);
+            if (getType() != 1) {
+                receiveUDPMessage(receivingAddress, 4321);
+            }
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -75,10 +115,28 @@ public class Router implements Runnable {
         this.name = name;
     }
 
-    public Router() {}
+    public Router() {
+        forwardAddress = new ArrayList<InetAddress>();
+    }
 
     public int getName() {
         return name;
+    }
+
+    public ArrayList<InetAddress> getForwardAddress() {
+        return forwardAddress;
+    }
+
+    public void setForwardAddress(ArrayList<InetAddress> forwardAddress) {
+        this.forwardAddress = forwardAddress;
+    }
+
+    public InetAddress getReceivingAddress() {
+        return receivingAddress;
+    }
+
+    public void setReceivingAddress(InetAddress receivingAddress) {
+        this.receivingAddress = receivingAddress;
     }
 
     public InetAddress getHostIP() {

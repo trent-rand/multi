@@ -6,11 +6,14 @@ public class NetworkLink {
     private Router routerB;
     private int cost;
 
-    public NetworkLink(Router routerA, Router routerB, int cost) {
+    public NetworkLink(Router routerA, Router routerB) {
         this.routerA = routerA;
         this.routerB = routerB;
-        this.cost = cost;
     }
+
+    public NetworkLink() {
+    }
+
 
     public Router getRouterA() {
         return routerA;
